@@ -18,11 +18,12 @@ jobs:
 
       - name: Fix gradle files
         run: |
+          ls -R
+          mkdir -p app
           cat > settings.gradle <<'EOF'
           rootProject.name = "Sejio"
           include ':app'
           EOF
-
           cat > build.gradle <<'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
@@ -32,7 +33,6 @@ jobs:
               repositories { google(); mavenCentral() }
           }
           EOF
-
           cat > app/build.gradle <<'EOF'
           apply plugin: 'com.android.application'
 
