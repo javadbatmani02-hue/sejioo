@@ -2,33 +2,73 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, master, sejioo ]
+    branches: [ "sejioo", "main", "master" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '8.2'
+      - name: Fix gradle files
+        run: |
+          cat > settings.gradle <<'EOF'
+          rootProject.name = "Sejio"
+          include ':app'
+          EOF
 
-    - name: Build with Gradle
-      run: gradle assembleDebug --no-daemon
+          cat > build.gradle <<'EOF'
+          buildscript {
+              repositories { google(); mavenCentral() }
+              dependencies { classpath 'com.android.tools.build:gradle:8.1.2' }
+          }
+          allprojects {
+              repositories { google(); mavenCentral() }
+          }
+          EOF
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+          cat > app/build.gradle <<'EOF'
+          apply plugin: 'com.android.application'
+
+          android {
+              namespace 'app.zizi.assistant'
+              compileSdk 33
+
+              defaultConfig {
+                  applicationId "app.zizi.assistant"
+                  minSdk 24
+                  targetSdk 33
+                  versionCode 1
+                  versionName "0.1"
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'com.google.android.material:material:1.9.0'
+          }
+          EOF
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
+
+      - name: Build
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
