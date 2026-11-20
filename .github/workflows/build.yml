@@ -18,27 +18,44 @@ jobs:
 
       - name: Prepare project
         run: |
-          echo "=== TREE BEFORE ==="
-          ls -R
-          echo "=== END TREE ==="
+          set -e
+          echo "=== FILES IN REPO ==="
+          ls -R | head -50
 
-          M=$(find . -name AndroidManifest.xml -not -path './.git/*' | head -1)
-          echo "MANIFEST: $M"
-          if [ -n "$M" ]; then
-            S=$(dirname "$(dirname "$M")")
-            echo "SOURCE DIR: $S"
-            if [ "$S" != "./app/src" ]; then
-              rm -rf app/src
-              mkdir -p app
-              cp -r "$S" app/src
-            fi
+          rm -rf /tmp/b
+          mkdir -p /tmp/b/java /tmp/b/main /tmp/b/res/layout /tmp/b/res/values /tmp/b/res/drawable
+
+          find . -path ./.git -prune -o -name '*.java' -print -exec cp {} /tmp/b/java/ \;
+          find . -path ./.git -prune -o -name 'AndroidManifest.xml' -print -exec cp {} /tmp/b/main/ \;
+          find . -path ./.git -prune -o -name 'activity_main.xml' -print -exec cp {} /tmp/b/res/layout/ \;
+          find . -path ./.git -prune -o -name 'strings.xml' -print -exec cp {} /tmp/b/res/values/ \;
+          find . -path ./.git -prune -o -name 'styles.xml' -print -exec cp {} /tmp/b/res/values/ \;
+          find . -path ./.git -prune -o -name 'ic_launcher*' -print -exec cp {} /tmp/b/res/drawable/ \;
+
+          rm -rf app
+          mkdir -p app/src/main/java/app/zizi/assistant
+          mkdir -p app/src/main/res/layout app/src/main/res/values app/src/main/res/drawable
+
+          cp /tmp/b/java/*.java app/src/main/java/app/zizi/assistant/
+          cp /tmp/b/main/AndroidManifest.xml app/src/main/
+          cp /tmp/b/res/layout/activity_main.xml app/src/main/res/layout/
+          cp /tmp/b/res/values/strings.xml app/src/main/res/values/
+          cp /tmp/b/res/values/styles.xml app/src/main/res/values/
+          if ls /tmp/b/res/drawable/* >/dev/null 2>&1; then
+            cp /tmp/b/res/drawable/* app/src/main/res/drawable/
+          else
+            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="24" android:viewportHeight="24">' '  <path android:fillColor="#2BB673" android:pathData="M12,14a3,3 0 0,0 3,-3V5a3,3 0 0,0 -6,0v6a3,3 0 0,0 3,3z"/>' '</vector>' > app/src/main/res/drawable/ic_launcher.xml
           fi
-
-          mkdir -p app
 
           cat > settings.gradle <<'EOF'
           rootProject.name = "Sejio"
           include ':app'
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.nonTransitiveRClass=false
           EOF
 
           cat > build.gradle <<'EOF'
@@ -51,19 +68,12 @@ jobs:
           }
           EOF
 
-          cat > gradle.properties <<'EOF'
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          android.nonTransitiveRClass=false
-          EOF
-
           cat > app/build.gradle <<'EOF'
           apply plugin: 'com.android.application'
 
           android {
               namespace 'app.zizi.assistant'
               compileSdk 33
-
               defaultConfig {
                   applicationId "app.zizi.assistant"
                   minSdk 24
@@ -71,7 +81,6 @@ jobs:
                   versionCode 1
                   versionName "0.1"
               }
-
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
                   targetCompatibility JavaVersion.VERSION_17
@@ -84,8 +93,8 @@ jobs:
           }
           EOF
 
-          echo "=== TREE AFTER ==="
-          ls -R app
+          echo "=== PROJECT TREE ==="
+          find app -type f | sort
 
       - uses: gradle/actions/setup-gradle@v3
         with:
