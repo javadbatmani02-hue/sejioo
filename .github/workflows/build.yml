@@ -16,14 +16,31 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Fix gradle files
+      - name: Prepare project
         run: |
+          echo "=== TREE BEFORE ==="
           ls -R
+          echo "=== END TREE ==="
+
+          M=$(find . -name AndroidManifest.xml -not -path './.git/*' | head -1)
+          echo "MANIFEST: $M"
+          if [ -n "$M" ]; then
+            S=$(dirname "$(dirname "$M")")
+            echo "SOURCE DIR: $S"
+            if [ "$S" != "./app/src" ]; then
+              rm -rf app/src
+              mkdir -p app
+              cp -r "$S" app/src
+            fi
+          fi
+
           mkdir -p app
+
           cat > settings.gradle <<'EOF'
           rootProject.name = "Sejio"
           include ':app'
           EOF
+
           cat > build.gradle <<'EOF'
           buildscript {
               repositories { google(); mavenCentral() }
@@ -33,6 +50,13 @@ jobs:
               repositories { google(); mavenCentral() }
           }
           EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          android.nonTransitiveRClass=false
+          EOF
+
           cat > app/build.gradle <<'EOF'
           apply plugin: 'com.android.application'
 
@@ -60,12 +84,15 @@ jobs:
           }
           EOF
 
+          echo "=== TREE AFTER ==="
+          ls -R app
+
       - uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.2'
 
       - name: Build
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon
 
       - uses: actions/upload-artifact@v4
         if: always()
